@@ -44,6 +44,77 @@ ASSIGNMENT_OPERATOR: ':=';
 
 
 
-//--- PARSER: ---
-stylesheet: EOF;
+// --- PARSER: ---
+stylesheet
+    :   (statement)* EOF
+    ;
+
+statement
+    :   ruleset
+    |   variableAssignment
+    |   ifClause
+    ;
+
+ruleset
+    :   selectorSet blok
+    ;
+
+selectorSet
+    :   selector (COMMA selector)*
+    ;
+
+selector
+    :   ID_IDENT        # idSelector
+    |   CLASS_IDENT     # classSelector
+    |   LOWER_IDENT     # tagSelector
+    ;
+
+blok
+    :   OPEN_BRACE (declaration | ifClause | variableAssignment)* CLOSE_BRACE
+    ;
+
+declaration
+    :   LOWER_IDENT COLON expression SEMICOLON
+    ;
+
+variableAssignment
+    :   CAPITAL_IDENT ASSIGNMENT_OPERATOR expression SEMICOLON
+    ;
+
+ifClause
+    :   IF BOX_BRACKET_OPEN boolExpression BOX_BRACKET_CLOSE blok (ELSE blok)?
+    ;
+
+// ----- expressies (met prioriteit * boven +/-) -----
+expression
+    :   additionExpr
+    ;
+
+additionExpr
+    :   multiplicationExpr ( (PLUS | MIN) multiplicationExpr )*
+    ;
+
+multiplicationExpr
+    :   primaryExpr ( MUL primaryExpr )*
+    ;
+
+primaryExpr
+    :   PIXELSIZE
+    |   PERCENTAGE
+    |   SCALAR
+    |   COLOR
+    |   CAPITAL_IDENT         // variabel refereren
+    |   LOWER_IDENT           // TRUE/FALSE als LOWER_IDENT wil je niet; we hebben TRUE/FALSE tokens
+    |   TRUE
+    |   FALSE
+    |   BOX_BRACKET_OPEN additionExpr BOX_BRACKET_CLOSE  // optioneel: (…)
+    ;
+
+// booleans voor if
+boolExpression
+    :   TRUE
+    |   FALSE
+    |   CAPITAL_IDENT         // variabele die bool oplevert
+    ;
+
 
