@@ -17,18 +17,18 @@ PERCENTAGE: [0-9]+ '%';
 SCALAR: [0-9]+;
 
 
-//Color value takes precedence over id idents
+//Kleur neemt prioriteit
 COLOR: '#' [0-9a-f] [0-9a-f] [0-9a-f] [0-9a-f] [0-9a-f] [0-9a-f];
 
-//Specific identifiers for id's and css classes
+//Specifieke identifiers voor CSS selectors en classes
 ID_IDENT: '#' [a-z0-9\-]+;
 CLASS_IDENT: '.' [a-z0-9\-]+;
 
-//General identifiers
+//Identifiers
 LOWER_IDENT: [a-z] [a-z0-9\-]*;
 CAPITAL_IDENT: [A-Z] [A-Za-z0-9_]*;
 
-//All whitespace is skipped
+//Alle whitespace wordt geskipped
 WS: [ \t\r\n]+ -> skip;
 
 //
@@ -85,7 +85,7 @@ ifClause
     :   IF BOX_BRACKET_OPEN boolExpression BOX_BRACKET_CLOSE blok (ELSE blok)?
     ;
 
-// ----- expressies (met prioriteit * boven +/-) -----
+// Wiskundige
 expression
     :   additionExpr
     ;
@@ -104,10 +104,10 @@ primaryExpr
     |   SCALAR
     |   COLOR
     |   CAPITAL_IDENT         // variabel refereren
-    |   LOWER_IDENT           // TRUE/FALSE als LOWER_IDENT wil je niet; we hebben TRUE/FALSE tokens
+    |   LOWER_IDENT
     |   TRUE
     |   FALSE
-    |   BOX_BRACKET_OPEN additionExpr BOX_BRACKET_CLOSE  // optioneel: (…)
+    |   BOX_BRACKET_OPEN additionExpr BOX_BRACKET_CLOSE
     ;
 
 // booleans voor if
@@ -116,5 +116,4 @@ boolExpression
     |   FALSE
     |   CAPITAL_IDENT         // variabele die bool oplevert
     ;
-
 
