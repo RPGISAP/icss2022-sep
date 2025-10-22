@@ -14,7 +14,6 @@ public class ASTListener extends ICSSBaseListener {
 	private final HANStack<Expression> expressieStack = new HANStack<>();
 	private final HANStack<Integer> frameStack = new HANStack<>();
 	private int expressieStackGrootte = 0;
-	// else-detectie tijdens if
 	private boolean elseActief = false;
 	private boolean inIfVoorwaarde = false;
 	private StringBuilder ifCondBuffer = new StringBuilder();
@@ -22,7 +21,7 @@ public class ASTListener extends ICSSBaseListener {
 	public ASTListener() {
 		this.ast = new AST();
 		this.containerStack = new HANStack<>();
-		System.out.println("ASTListener loaded from: " +
+		System.out.println("ASTListener geladen van: " +
 				ASTListener.class.getProtectionDomain().getCodeSource().getLocation());
 	}
 
@@ -81,8 +80,8 @@ public class ASTListener extends ICSSBaseListener {
 	@Override
 	public void enterStylesheet(ICSSParser.StylesheetContext ctx) {
 		nl.han.ica.icss.ast.Stylesheet sheet = new nl.han.ica.icss.ast.Stylesheet();
-		ast.setRoot(sheet);   // ensure the AST has a non-null root
-		push(sheet);          // push the actual node, not null
+		ast.setRoot(sheet);
+		push(sheet);
 	}
 
 	@Override
@@ -137,7 +136,6 @@ public class ASTListener extends ICSSBaseListener {
 		if (!waarden.isEmpty()) {
 			decl.addChild(waarden.get(0));
 		} else {
-			// safety: never leave the value slot empty
 			decl.addChild(new nl.han.ica.icss.ast.literals.ScalarLiteral(0));
 		}
 		ASTNode declaratie = pop();
@@ -244,7 +242,7 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void enterVariableAssignment(ICSSParser.VariableAssignmentContext ctx) {
-		nl.han.ica.icss.ast.VariableAssignment toekenning = new nl.han.ica.icss.ast.VariableAssignment(); // no-args ctor
+		nl.han.ica.icss.ast.VariableAssignment toekenning = new nl.han.ica.icss.ast.VariableAssignment();
 		toekenning.name = new nl.han.ica.icss.ast.VariableReference(ctx.CAPITAL_IDENT().getText());
 		push(toekenning);
 		startFrame(); // waarde van de variabele
@@ -263,10 +261,8 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void enterIfClause(ICSSParser.IfClauseContext ctx) {
-		// Create the IfClause node
 		nl.han.ica.icss.ast.IfClause ifNode = new nl.han.ica.icss.ast.IfClause();
 
-		// Always set a non-null condition immediately
 		nl.han.ica.icss.ast.Expression cond;
 		String txt = (ctx.boolExpression() != null) ? ctx.boolExpression().getText() : null;
 		if ("TRUE".equals(txt)) {
@@ -274,22 +270,15 @@ public class ASTListener extends ICSSBaseListener {
 		} else if ("FALSE".equals(txt)) {
 			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(false);
 		} else if (txt != null && !txt.isEmpty()) {
-			// CAPITAL_IDENT (e.g. UseLinkColor)
 			cond = new nl.han.ica.icss.ast.VariableReference(txt);
 		} else {
-			// last-resort fallback to keep AST non-null
 			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(true);
 		}
 		ifNode.conditionalExpression = cond;
-
-		// keep expression-frame consistent for anything that relies on it
 		startFrame();
 		exprPush(cond);
-
-		// push the IfClause so declarations in the first blok attach to it
 		push(ifNode);
 
-		// flags/buffer housekeeping
 		elseActief = false;
 		inIfVoorwaarde = false;
 		ifCondBuffer.setLength(0);
@@ -297,13 +286,10 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void exitIfClause(ICSSParser.IfClauseContext ctx) {
-		// If we had pushed an ElseClause, pop it first
 		if (elseActief) {
 			try { pop(); } catch (Exception ignored) {}
 			elseActief = false;
 		}
-
-		// Resolve condition from the expression frame (or buffer fallback)
 		int indexVoor = eindFrameIndex();
 		java.util.List<Expression> conds = pakOperandenSindsFrame(indexVoor);
 		if (conds.isEmpty()) {
@@ -322,33 +308,26 @@ public class ASTListener extends ICSSBaseListener {
 			conds.add(new nl.han.ica.icss.ast.literals.BoolLiteral(true));
 		}
 
-		// Set final condition on the IfClause (never null)
 		nl.han.ica.icss.ast.IfClause ifNodeObj = (nl.han.ica.icss.ast.IfClause) top();
 		ifNodeObj.conditionalExpression = conds.get(0);
 
-		// Done with this IfClause
 		ASTNode ifNode = pop();
-		hangAanOuder(ifNode); // hang to parent (Stylerule or ElseClause)
+		hangAanOuder(ifNode);
 	}
 
 
 	@Override
 	public void visitTerminal(org.antlr.v4.runtime.tree.TerminalNode node) {
 		int t = node.getSymbol().getType();
-
-		// Create/push ElseClause ONLY when we actually see 'else'
 		if (t == ICSSParser.ELSE && top() instanceof nl.han.ica.icss.ast.IfClause) {
 			nl.han.ica.icss.ast.IfClause ifNode = (nl.han.ica.icss.ast.IfClause) top();
 			if (ifNode.elseClause == null) {
 				ifNode.elseClause = new nl.han.ica.icss.ast.ElseClause();
 			}
-			// Declarations inside the else-blok should attach to this ElseClause
 			push(ifNode.elseClause);
 			elseActief = true;
 			return;
 		}
-
-		// Optional: buffering for bracketed tokens if you keep that logic
 		if (top() instanceof nl.han.ica.icss.ast.IfClause) {
 			if (t == ICSSParser.BOX_BRACKET_OPEN) { inIfVoorwaarde = true; ifCondBuffer.setLength(0); return; }
 			if (t == ICSSParser.BOX_BRACKET_CLOSE) { inIfVoorwaarde = false; return; }
