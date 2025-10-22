@@ -13,25 +13,30 @@ public class AST {
 	public AST() {
 		root = new Stylesheet();
 	}
+
 	public AST(Stylesheet stylesheet) {
 		root = stylesheet;
 	}
+
 	public void setRoot(Stylesheet stylesheet) {
 		root = stylesheet;
 	}
-    public ArrayList<SemanticError> getErrors() {
-	    ArrayList<SemanticError> errors = new ArrayList<>();
-        collectErrors(errors,root);
-        return errors;
-    }
-    private void collectErrors(ArrayList<SemanticError> errors, ASTNode node) {
-	    if(node.hasError()) {
-	        errors.add(node.getError());
-        }
-        for(ASTNode child: node.getChildren()) {
-	        collectErrors(errors,child);
-        }
-    }
+
+	public ArrayList<SemanticError> getErrors() {
+		ArrayList<SemanticError> errors = new ArrayList<>();
+		collectErrors(errors, root);
+		return errors;
+	}
+
+	private void collectErrors(ArrayList<SemanticError> errors, ASTNode node) {
+		if (node.hasError()) {
+			errors.add(node.getError());
+		}
+		for (ASTNode child : node.getChildren()) {
+			collectErrors(errors, child);
+		}
+	}
+
 	@Override
 	public String toString() {
 		return root.toString();
@@ -50,3 +55,5 @@ public class AST {
 		return Objects.hash(root);
 	}
 }
+
+

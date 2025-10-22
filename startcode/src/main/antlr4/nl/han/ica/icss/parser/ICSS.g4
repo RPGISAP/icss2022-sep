@@ -39,6 +39,7 @@ COLON: ':';
 PLUS: '+';
 MIN: '-';
 MUL: '*';
+COMMA: ',';
 ASSIGNMENT_OPERATOR: ':=';
 
 

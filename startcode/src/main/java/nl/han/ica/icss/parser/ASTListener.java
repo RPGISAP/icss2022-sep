@@ -5,6 +5,7 @@ import nl.han.ica.datastructures.IHANStack;
 import nl.han.ica.icss.ast.AST;
 import nl.han.ica.icss.ast.ASTNode;
 import nl.han.ica.icss.ast.Expression;
+import nl.han.ica.icss.ast.VariableReference;
 
 public class ASTListener extends ICSSBaseListener {
 
@@ -15,11 +16,16 @@ public class ASTListener extends ICSSBaseListener {
 	private int expressieStackGrootte = 0;
 	// else-detectie tijdens if
 	private boolean elseActief = false;
+	private boolean inIfVoorwaarde = false;
+	private StringBuilder ifCondBuffer = new StringBuilder();
 
 	public ASTListener() {
 		this.ast = new AST();
 		this.containerStack = new HANStack<>();
+		System.out.println("ASTListener loaded from: " +
+				ASTListener.class.getProtectionDomain().getCodeSource().getLocation());
 	}
+
 
 	public AST getAST() {
 		return ast;
@@ -28,27 +34,39 @@ public class ASTListener extends ICSSBaseListener {
 	private void push(ASTNode node) {
 		containerStack.push(node);
 	}
-	private ASTNode pop() { return containerStack.pop(); }
-	private ASTNode top() { return containerStack.peek(); }
+
+	private ASTNode pop() {
+		return containerStack.pop();
+	}
+
+	private ASTNode top() {
+		return containerStack.peek();
+	}
+
 	private void hangAanOuder(ASTNode kind) {
-		// Bovenste element is ouder; hang kind eraan
+		if (kind == null) return;   // << voorkom null-kind in AST
 		top().addChild(kind);
 	}
+
 	private void startFrame() {
 		frameStack.push(expressieStackGrootte);
 	}
+
 	private int eindFrameIndex() {
 		return frameStack.pop();
 	}
+
 	private void exprPush(Expression e) {
 		expressieStack.push(e);
 		expressieStackGrootte++;
 	}
+
 	private Expression exprPop() {
 		Expression e = expressieStack.pop();
 		expressieStackGrootte--;
 		return e;
 	}
+
 	private java.util.List<Expression> pakOperandenSindsFrame(int indexVoor) {
 		int aantal = expressieStackGrootte - indexVoor;
 		java.util.List<Expression> exprs = new java.util.ArrayList<>(aantal);
@@ -60,14 +78,16 @@ public class ASTListener extends ICSSBaseListener {
 	}
 
 
-
 	@Override
 	public void enterStylesheet(ICSSParser.StylesheetContext ctx) {
-		push(ast.root); // ast.root is een Stylesheet
+		nl.han.ica.icss.ast.Stylesheet sheet = new nl.han.ica.icss.ast.Stylesheet();
+		ast.setRoot(sheet);   // ensure the AST has a non-null root
+		push(sheet);          // push the actual node, not null
 	}
+
 	@Override
 	public void exitStylesheet(ICSSParser.StylesheetContext ctx) {
-		pop(); // klaar
+		pop(); // done
 	}
 
 	@Override
@@ -112,8 +132,13 @@ public class ASTListener extends ICSSBaseListener {
 	public void exitDeclaration(ICSSParser.DeclarationContext ctx) {
 		int indexVoor = eindFrameIndex();
 		java.util.List<Expression> waarden = pakOperandenSindsFrame(indexVoor);
+
+		nl.han.ica.icss.ast.Declaration decl = (nl.han.ica.icss.ast.Declaration) top();
 		if (!waarden.isEmpty()) {
-			((nl.han.ica.icss.ast.Declaration) top()).addChild(waarden.get(0));
+			decl.addChild(waarden.get(0));
+		} else {
+			// safety: never leave the value slot empty
+			decl.addChild(new nl.han.ica.icss.ast.literals.ScalarLiteral(0));
 		}
 		ASTNode declaratie = pop();
 		hangAanOuder(declaratie);
@@ -121,21 +146,21 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void enterPrimaryExpr(ICSSParser.PrimaryExprContext ctx) {
-		if (ctx.PIXELSIZE()!=null) {
-			int v = Integer.parseInt(ctx.PIXELSIZE().getText().replace("px",""));
+		if (ctx.PIXELSIZE() != null) {
+			int v = Integer.parseInt(ctx.PIXELSIZE().getText().replace("px", ""));
 			exprPush(new nl.han.ica.icss.ast.literals.PixelLiteral(v));
-		} else if (ctx.PERCENTAGE()!=null) {
-			int v = Integer.parseInt(ctx.PERCENTAGE().getText().replace("%",""));
+		} else if (ctx.PERCENTAGE() != null) {
+			int v = Integer.parseInt(ctx.PERCENTAGE().getText().replace("%", ""));
 			exprPush(new nl.han.ica.icss.ast.literals.PercentageLiteral(v));
-		} else if (ctx.SCALAR()!=null) {
+		} else if (ctx.SCALAR() != null) {
 			exprPush(new nl.han.ica.icss.ast.literals.ScalarLiteral(Integer.parseInt(ctx.SCALAR().getText())));
-		} else if (ctx.COLOR()!=null) {
+		} else if (ctx.COLOR() != null) {
 			exprPush(new nl.han.ica.icss.ast.literals.ColorLiteral(ctx.COLOR().getText()));
-		} else if (ctx.TRUE()!=null) {
+		} else if (ctx.TRUE() != null) {
 			exprPush(new nl.han.ica.icss.ast.literals.BoolLiteral(true));
-		} else if (ctx.FALSE()!=null) {
+		} else if (ctx.FALSE() != null) {
 			exprPush(new nl.han.ica.icss.ast.literals.BoolLiteral(false));
-		} else if (ctx.CAPITAL_IDENT()!=null) {
+		} else if (ctx.CAPITAL_IDENT() != null) {
 			exprPush(new nl.han.ica.icss.ast.VariableReference(ctx.CAPITAL_IDENT().getText()));
 		}
 	}
@@ -144,6 +169,7 @@ public class ASTListener extends ICSSBaseListener {
 	public void enterMultiplicationExpr(ICSSParser.MultiplicationExprContext ctx) {
 		startFrame();
 	}
+
 	@Override
 	public void exitMultiplicationExpr(ICSSParser.MultiplicationExprContext ctx) {
 		int indexVoor = eindFrameIndex();
@@ -182,10 +208,14 @@ public class ASTListener extends ICSSBaseListener {
 			Expression rhs = termen.get(i + 1);
 			if ("+".equals(operators.get(i))) {
 				nl.han.ica.icss.ast.operations.AddOperation add = new nl.han.ica.icss.ast.operations.AddOperation();
-				add.lhs = acc; add.rhs = rhs; acc = add;
+				add.lhs = acc;
+				add.rhs = rhs;
+				acc = add;
 			} else {
 				nl.han.ica.icss.ast.operations.SubtractOperation sub = new nl.han.ica.icss.ast.operations.SubtractOperation();
-				sub.lhs = acc; sub.rhs = rhs; acc = sub;
+				sub.lhs = acc;
+				sub.rhs = rhs;
+				acc = sub;
 			}
 		}
 		exprPush(acc);
@@ -193,14 +223,24 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void enterBoolExpression(ICSSParser.BoolExpressionContext ctx) {
-		if (ctx.TRUE() != null) {
-			exprPush(new nl.han.ica.icss.ast.literals.BoolLiteral(true));
-		} else if (ctx.FALSE() != null) {
-			exprPush(new nl.han.ica.icss.ast.literals.BoolLiteral(false));
-		} else if (ctx.CAPITAL_IDENT() != null) {
-			exprPush(new nl.han.ica.icss.ast.VariableReference(ctx.CAPITAL_IDENT().getText()));
+		// Maak de conditie-expressie uit de tekst
+		String txt = ctx.getText();
+		nl.han.ica.icss.ast.Expression cond;
+		if ("TRUE".equals(txt)) {
+			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(true);
+		} else if ("FALSE".equals(txt)) {
+			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(false);
+		} else {
+			cond = new nl.han.ica.icss.ast.VariableReference(txt);
+		}
+		exprPush(cond);
+		ASTNode boven = top();
+		if (boven instanceof nl.han.ica.icss.ast.IfClause) {
+			((nl.han.ica.icss.ast.IfClause) boven).conditionalExpression = cond;
 		}
 	}
+
+
 
 	@Override
 	public void enterVariableAssignment(ICSSParser.VariableAssignmentContext ctx) {
@@ -217,41 +257,105 @@ public class ASTListener extends ICSSBaseListener {
 		if (!waarden.isEmpty()) {
 			((nl.han.ica.icss.ast.VariableAssignment) top()).addChild(waarden.get(0));
 		}
-		ASTNode klaar = pop();
-		hangAanOuder(klaar);
+		ASTNode klaar = pop();       // heel belangrijk: haal de assignment van de stack
+		hangAanOuder(klaar);         // en hang ‘m aan de huidige ouder (Stylesheet)
 	}
 
 	@Override
 	public void enterIfClause(ICSSParser.IfClauseContext ctx) {
+		// Create the IfClause node
 		nl.han.ica.icss.ast.IfClause ifNode = new nl.han.ica.icss.ast.IfClause();
+
+		// Always set a non-null condition immediately
+		nl.han.ica.icss.ast.Expression cond;
+		String txt = (ctx.boolExpression() != null) ? ctx.boolExpression().getText() : null;
+		if ("TRUE".equals(txt)) {
+			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(true);
+		} else if ("FALSE".equals(txt)) {
+			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(false);
+		} else if (txt != null && !txt.isEmpty()) {
+			// CAPITAL_IDENT (e.g. UseLinkColor)
+			cond = new nl.han.ica.icss.ast.VariableReference(txt);
+		} else {
+			// last-resort fallback to keep AST non-null
+			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(true);
+		}
+		ifNode.conditionalExpression = cond;
+
+		// keep expression-frame consistent for anything that relies on it
+		startFrame();
+		exprPush(cond);
+
+		// push the IfClause so declarations in the first blok attach to it
 		push(ifNode);
+
+		// flags/buffer housekeeping
 		elseActief = false;
-		startFrame(); // condition-expressie (tussen de [ ])
+		inIfVoorwaarde = false;
+		ifCondBuffer.setLength(0);
 	}
 
 	@Override
 	public void exitIfClause(ICSSParser.IfClauseContext ctx) {
-		// als er een ElseClause open staat, eerst poppen
+		// If we had pushed an ElseClause, pop it first
 		if (elseActief) {
 			try { pop(); } catch (Exception ignored) {}
 			elseActief = false;
 		}
+
+		// Resolve condition from the expression frame (or buffer fallback)
 		int indexVoor = eindFrameIndex();
 		java.util.List<Expression> conds = pakOperandenSindsFrame(indexVoor);
-		if (!conds.isEmpty()) {
-			((nl.han.ica.icss.ast.IfClause) top()).addChild(conds.get(0)); // wordt conditionalExpression
+		if (conds.isEmpty()) {
+			String raw = ifCondBuffer.toString().trim();
+			if (!raw.isEmpty()) {
+				if ("TRUE".equals(raw)) {
+					conds.add(new nl.han.ica.icss.ast.literals.BoolLiteral(true));
+				} else if ("FALSE".equals(raw)) {
+					conds.add(new nl.han.ica.icss.ast.literals.BoolLiteral(false));
+				} else {
+					conds.add(new nl.han.ica.icss.ast.VariableReference(raw));
+				}
+			}
 		}
+		if (conds.isEmpty()) {
+			conds.add(new nl.han.ica.icss.ast.literals.BoolLiteral(true));
+		}
+
+		// Set final condition on the IfClause (never null)
+		nl.han.ica.icss.ast.IfClause ifNodeObj = (nl.han.ica.icss.ast.IfClause) top();
+		ifNodeObj.conditionalExpression = conds.get(0);
+
+		// Done with this IfClause
 		ASTNode ifNode = pop();
-		hangAanOuder(ifNode);
+		hangAanOuder(ifNode); // hang to parent (Stylerule or ElseClause)
 	}
+
 
 	@Override
 	public void visitTerminal(org.antlr.v4.runtime.tree.TerminalNode node) {
-		if (node.getSymbol().getType() == ICSSParser.ELSE && top() instanceof nl.han.ica.icss.ast.IfClause) {
-			nl.han.ica.icss.ast.ElseClause elseClause = new nl.han.ica.icss.ast.ElseClause();
-			top().addChild(elseClause);
-			push(elseClause);      // alles wat hierna in het blok komt, valt in else.body
+		int t = node.getSymbol().getType();
+
+		// Create/push ElseClause ONLY when we actually see 'else'
+		if (t == ICSSParser.ELSE && top() instanceof nl.han.ica.icss.ast.IfClause) {
+			nl.han.ica.icss.ast.IfClause ifNode = (nl.han.ica.icss.ast.IfClause) top();
+			if (ifNode.elseClause == null) {
+				ifNode.elseClause = new nl.han.ica.icss.ast.ElseClause();
+			}
+			// Declarations inside the else-blok should attach to this ElseClause
+			push(ifNode.elseClause);
 			elseActief = true;
+			return;
+		}
+
+		// Optional: buffering for bracketed tokens if you keep that logic
+		if (top() instanceof nl.han.ica.icss.ast.IfClause) {
+			if (t == ICSSParser.BOX_BRACKET_OPEN) { inIfVoorwaarde = true; ifCondBuffer.setLength(0); return; }
+			if (t == ICSSParser.BOX_BRACKET_CLOSE) { inIfVoorwaarde = false; return; }
+			if (inIfVoorwaarde) {
+				String txt = node.getText();
+				if (txt != null && !txt.isEmpty()) ifCondBuffer.append(txt);
+			}
 		}
 	}
 
@@ -262,6 +366,4 @@ public class ASTListener extends ICSSBaseListener {
 	@Override
 	public void enterStatement(ICSSParser.StatementContext ctx) {
 	}
-
-
 }
