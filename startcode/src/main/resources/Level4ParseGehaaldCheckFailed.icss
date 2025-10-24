@@ -1,0 +1,12 @@
+LinkColor := #ff0000;
+ParWidth := 500px;
+AdjustColor := TRUE;
+UseLinkColor := FALSE;
+
+UseLinkColor := 3px;
+a {
+color: 12px;
+if [UseLinkColor] {
+width: 10px;
+}
+}
