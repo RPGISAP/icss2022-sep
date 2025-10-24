@@ -49,12 +49,9 @@ public class Checker {
 
         // ---- Scopes openen (pre-order) ----
         boolean scopeIsGeopendVoorDitKnooppunt = false;
-
         if (huidigKnooppunt instanceof Stylerule) {
-            // Nieuwe CSS-regel wordt nieuwe scope
             pushScope();
             scopeIsGeopendVoorDitKnooppunt = true;
-
         } else if (huidigKnooppunt instanceof IfClause) {
             // CH05: conditie van if moet boolean zijn
             IfClause ifKnoop = (IfClause) huidigKnooppunt;
@@ -62,11 +59,9 @@ public class Checker {
             if (typeVanVoorwaarde != ExpressionType.BOOL) {
                 ifKnoop.setError("If-voorwaarde moet van het type boolean zijn (CH05).");
             }
-
             // Scope voor het if-blok openen
             pushScope();
             scopeIsGeopendVoorDitKnooppunt = true;
-
         } else if (huidigKnooppunt instanceof ElseClause) {
             // Scope voor het else-blok
             pushScope();
@@ -78,16 +73,16 @@ public class Checker {
 
             VariableAssignment variabeleToekenning = (VariableAssignment) huidigKnooppunt;
 
-            // Pak de waarde rechts (RHS). In deze AST is dat het laatste kind.
+            // Rechterkant (RHS): in deze AST is dat doorgaans het laatste kind
             Expression rechterZijdeWaarde = null;
             if (!variabeleToekenning.getChildren().isEmpty()) {
-                ASTNode laatsteKind = variabeleToekenning
-                        .getChildren()
-                        .get(variabeleToekenning.getChildren().size() - 1);
+                ASTNode laatsteKind =
+                        variabeleToekenning.getChildren().get(variabeleToekenning.getChildren().size() - 1);
                 if (laatsteKind instanceof Expression) {
                     rechterZijdeWaarde = (Expression) laatsteKind;
                 }
             }
+
             ExpressionType typeVanRechterZijde = typeOf(rechterZijdeWaarde);
             if (typeVanRechterZijde == ExpressionType.UNDEFINED) {
                 variabeleToekenning.setError(
@@ -98,12 +93,12 @@ public class Checker {
 
             // CH06: variabele in de huidige scope registreren
             defineVar(variabeleToekenning.name.name, typeVanRechterZijde);
-
-        } else if (huidigKnooppunt instanceof Declaration) {
+        }
+        else if (huidigKnooppunt instanceof Declaration) {
 
             Declaration declaratie = (Declaration) huidigKnooppunt;
 
-            // Alleen checken als er een waarde is en die een Expression is
+            // Alleen checken als er een waarde is en die ook een Expression is
             if (!declaratie.getChildren().isEmpty()
                     && declaratie.getChildren().get(0) instanceof Expression) {
 
@@ -116,25 +111,26 @@ public class Checker {
                         : declaratie.property.toString().toLowerCase(java.util.Locale.ROOT);
 
                 // CH04: type van de value moet passen bij de property
-                if ("color".equals(eigenschapTekst)) {
+                if ("color".equals(eigenschapTekst) || "background-color".equals(eigenschapTekst)) {
                     if (typeVanWaarde != ExpressionType.COLOR) {
-                        declaratie.setError("Eigenschap 'color' verwacht een kleurwaarde (CH04).");
+                        declaratie.setError("Eigenschap '" + eigenschapTekst + "' verwacht een kleurwaarde (CH04).");
                     }
                 } else if ("width".equals(eigenschapTekst) || "height".equals(eigenschapTekst)) {
                     boolean isToegestaneLengte =
-                            (typeVanWaarde == ExpressionType.PIXEL
-                                    || typeVanWaarde == ExpressionType.PERCENTAGE);
+                            (typeVanWaarde == ExpressionType.PIXEL || typeVanWaarde == ExpressionType.PERCENTAGE);
                     if (!isToegestaneLengte) {
                         declaratie.setError(
-                                "Eigenschap '" + eigenschapTekst
-                                        + "' verwacht een pixel- of percentagewaarde (CH04)."
+                                "Eigenschap '" + eigenschapTekst + "' verwacht een pixel- of percentagewaarde (CH04)."
                         );
                     }
+                } else {
+                    // Niet in de lijst van toegestane properties
+                    declaratie.setError("Eigenschap '" + eigenschapTekst + "' is niet toegestaan in ICSS.");
                 }
             }
         }
 
-        // ---- child nodes kijken ----
+        // ---- Kinderen bezoeken ----
         for (ASTNode kind : huidigKnooppunt.getChildren()) {
             visit(kind);
         }
@@ -144,6 +140,7 @@ public class Checker {
             popScope();
         }
     }
+
 
     // ====== Typebepaling van de expressies en CH02/CH03 ======
     private ExpressionType typeOf(Expression expressie) {
