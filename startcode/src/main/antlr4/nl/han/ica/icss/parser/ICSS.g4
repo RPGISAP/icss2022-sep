@@ -3,8 +3,8 @@ grammar ICSS;
 //--- LEXER: ---
 
 // IF support:
-IF: 'if';
-ELSE: 'else';
+IF   : [iI] [fF];
+ELSE : [eE] [lL] [sS] [eE];
 BOX_BRACKET_OPEN: '[';
 BOX_BRACKET_CLOSE: ']';
 
@@ -39,6 +39,7 @@ COLON: ':';
 PLUS: '+';
 MIN: '-';
 MUL: '*';
+COMMA: ',';
 ASSIGNMENT_OPERATOR: ':=';
 
 

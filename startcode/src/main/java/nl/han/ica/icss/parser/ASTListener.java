@@ -238,8 +238,6 @@ public class ASTListener extends ICSSBaseListener {
 		}
 	}
 
-
-
 	@Override
 	public void enterVariableAssignment(ICSSParser.VariableAssignmentContext ctx) {
 		nl.han.ica.icss.ast.VariableAssignment toekenning = new nl.han.ica.icss.ast.VariableAssignment();
