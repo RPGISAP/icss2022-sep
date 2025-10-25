@@ -9,28 +9,42 @@ import nl.han.ica.icss.ast.types.ExpressionType;
 import java.util.HashMap;
 
 public class Checker {
+    // Ik hou per scope bij welke variabelen bestaan en welk type ze hebben
+    // Bovenaan (index 0) staat altijd de huidige scope
     private IHANLinkedList<HashMap<String, ExpressionType>> variabeleTypenPerScope;
 
     public void check(AST ast) {
+        // Start elke check met een schone stack scopes
         variabeleTypenPerScope = new HANLinkedList<>();
+
+        // Globale scope (stylesheet pmuch) eerst openen
         pushScope();
+
+        // Dan de hele boom langs en overal controles doen
         visit(ast.root);
+
+        // Klaar met de globale scope
         popScope();
     }
 
-    // ====== Scope helpers ======
+    // Scope helpers
+
+    // Nieuwe scope erbij (bijv. bij het binnenlopen van een rule of if/else).
     private void pushScope() {
         variabeleTypenPerScope.addFirst(new HashMap<>());
     }
 
+    // Klaar met de huidige scope en weer van de stapel af
     private void popScope() {
         if (variabeleTypenPerScope.getSize() > 0) variabeleTypenPerScope.removeFirst();
     }
 
+    // Handige getter voor “bovenste” scope.
     private HashMap<String, ExpressionType> topScope() {
         return variabeleTypenPerScope.getFirst();
     }
 
+    // Zoek het type van een variabele, beginnend bij de meest nabije scope
     private ExpressionType lookupVarType(String name) {
         for (int i = 0; i < variabeleTypenPerScope.getSize(); i++) {
             HashMap<String, ExpressionType> s = variabeleTypenPerScope.get(i);
@@ -39,41 +53,47 @@ public class Checker {
         return ExpressionType.UNDEFINED;
     }
 
+    // Variabele (opnieuw) vastleggen in de huidige scope.
     private void defineVar(String name, ExpressionType type) {
         topScope().put(name, type);
     }
 
-    // ====== AST-traversal & scope-afhandeling ======
+    // AST-traversal openen/sluiten van scopes
     private void visit(ASTNode huidigKnooppunt) {
         if (huidigKnooppunt == null) return;
 
-        // ---- Scopes openen (pre-order) ----
+        // Scopes openen voorda we de kinderen langs gaan (pre-order)
         boolean scopeIsGeopendVoorDitKnooppunt = false;
+
         if (huidigKnooppunt instanceof Stylerule) {
+            // Elke CSS regel krijgt zijn eigen scope
             pushScope();
             scopeIsGeopendVoorDitKnooppunt = true;
+
         } else if (huidigKnooppunt instanceof IfClause) {
-            // CH05: conditie van if moet boolean zijn
+            // If condition moet gewoon boolean zijn, zo niet dan fout op de if-knoop
             IfClause ifKnoop = (IfClause) huidigKnooppunt;
             ExpressionType typeVanVoorwaarde = typeOf(ifKnoop.conditionalExpression);
             if (typeVanVoorwaarde != ExpressionType.BOOL) {
                 ifKnoop.setError("If-voorwaarde moet van het type boolean zijn (CH05).");
             }
-            // Scope voor het if-blok openen
+            // Ook if-blokken hebben hun eigen scope.
             pushScope();
             scopeIsGeopendVoorDitKnooppunt = true;
+
         } else if (huidigKnooppunt instanceof ElseClause) {
-            // Scope voor het else-blok
+            // Else blokken net zo goed.
             pushScope();
             scopeIsGeopendVoorDitKnooppunt = true;
         }
 
-        // ---- Node-specifieke controles/acties ----
-        if (huidigKnooppunt instanceof VariableAssignment) {
+        // Node-specifieke checks
 
+        if (huidigKnooppunt instanceof VariableAssignment) {
+            // eerst type bepalen van de rechterkant
             VariableAssignment variabeleToekenning = (VariableAssignment) huidigKnooppunt;
 
-            // Rechterkant (RHS): in deze AST is dat doorgaans het laatste kind
+            // In deze AST is de waarde meestal het laatste kind
             Expression rechterZijdeWaarde = null;
             if (!variabeleToekenning.getChildren().isEmpty()) {
                 ASTNode laatsteKind =
@@ -84,6 +104,8 @@ public class Checker {
             }
 
             ExpressionType typeVanRechterZijde = typeOf(rechterZijdeWaarde);
+
+            // Geen type? Dan mis ik een definitie of klopt er iets niet in de expressie die ik heb neergezet
             if (typeVanRechterZijde == ExpressionType.UNDEFINED) {
                 variabeleToekenning.setError(
                         "Rechterkant van variabele '" + variabeleToekenning.name.name
@@ -91,26 +113,26 @@ public class Checker {
                 );
             }
 
-            // CH06: variabele in de huidige scope registreren
+            // Variabele direct vastleggen in de huidige scope
             defineVar(variabeleToekenning.name.name, typeVanRechterZijde);
-        }
-        else if (huidigKnooppunt instanceof Declaration) {
 
+        } else if (huidigKnooppunt instanceof Declaration) {
+            // Declaraties (property: value): check of de value past bij de property
             Declaration declaratie = (Declaration) huidigKnooppunt;
 
-            // Alleen checken als er een waarde is en die ook een Expression is
+            // Alleen checken als er ook echt een waarde (expression) staat
             if (!declaratie.getChildren().isEmpty()
                     && declaratie.getChildren().get(0) instanceof Expression) {
 
                 Expression waarde = (Expression) declaratie.getChildren().get(0);
                 ExpressionType typeVanWaarde = typeOf(waarde);
 
-                // Eigenschapsnaam als tekst (PropertyName is blijkbaar geen enum, dus stringify (kannie herrineren als ik dit gedaan heb of niet ik neem geen kansen)
+                // Property naam pak ik als string (PropertyName is hier geen enum).
                 String eigenschapTekst = (declaratie.property == null)
                         ? ""
                         : declaratie.property.toString().toLowerCase(java.util.Locale.ROOT);
 
-                // CH04: type van de value moet passen bij de property
+                // Alleen deze properties zijn toegestaan. Type moet kloppen
                 if ("color".equals(eigenschapTekst) || "background-color".equals(eigenschapTekst)) {
                     if (typeVanWaarde != ExpressionType.COLOR) {
                         declaratie.setError("Eigenschap '" + eigenschapTekst + "' verwacht een kleurwaarde (CH04).");
@@ -124,36 +146,35 @@ public class Checker {
                         );
                     }
                 } else {
-                    // Niet in de lijst van toegestane properties
+                    // Alles buiten de whitelist is in ICSS niet toegestaan
                     declaratie.setError("Eigenschap '" + eigenschapTekst + "' is niet toegestaan in ICSS.");
                 }
             }
         }
 
-        // ---- Kinderen bezoeken ----
+        // Kinderen bezoeken (diep de boom in)
         for (ASTNode kind : huidigKnooppunt.getChildren()) {
             visit(kind);
         }
 
-        // ---- Scopes sluiten (post-order) ----
+        // Scopes weer sluiten nadat we de kinderen gehad hebben (post-order).
         if (scopeIsGeopendVoorDitKnooppunt) {
             popScope();
         }
     }
 
-
-    // ====== Typebepaling van de expressies en CH02/CH03 ======
+    // Typebepaling voor expressies + regels CH02/CH03
     private ExpressionType typeOf(Expression expressie) {
         if (expressie == null) return ExpressionType.UNDEFINED;
 
-        // Literal-types
+        // Literals hebben een vast type; klaar.
         if (expressie instanceof PixelLiteral)      return ExpressionType.PIXEL;
         if (expressie instanceof PercentageLiteral) return ExpressionType.PERCENTAGE;
         if (expressie instanceof ScalarLiteral)     return ExpressionType.SCALAR;
         if (expressie instanceof ColorLiteral)      return ExpressionType.COLOR;
         if (expressie instanceof BoolLiteral)       return ExpressionType.BOOL;
 
-        // Variabele-referentie
+        // type komt uit de scope (anders undefined en foutje zetten).
         if (expressie instanceof VariableReference) {
             String variabeleNaam = ((VariableReference) expressie).name;
             ExpressionType gevondenType = lookupVarType(variabeleNaam);
@@ -163,76 +184,80 @@ public class Checker {
             return gevondenType;
         }
 
-        // Optelling/Aftrekking (CH02, CH03)
+        // Optellen/Aftrekken:
+        // * Geen kleuren in rekensommen (CH03)
+        // * Operanden moeten gelijk type hebben en niet boolaen zijn (CH02)
         if (expressie instanceof AddOperation || expressie instanceof SubtractOperation) {
             Operation bewerking = (Operation) expressie;
             ExpressionType linkerType = typeOf(bewerking.lhs);
             ExpressionType rechterType = typeOf(bewerking.rhs);
 
-            // CH03: geen kleuren in rekenoperaties
             if (linkerType == ExpressionType.COLOR || rechterType == ExpressionType.COLOR) {
                 expressie.setError("Kleurwaarden mogen niet gebruikt worden in + of - (CH03).");
                 return ExpressionType.UNDEFINED;
             }
 
-            // CH02: +/− alleen als types gelijk zijn en niet-boolean
             boolean typesZijnGelijk = (linkerType == rechterType);
             boolean isBooleanBijOperand = (linkerType == ExpressionType.BOOL || rechterType == ExpressionType.BOOL);
             if (!typesZijnGelijk || isBooleanBijOperand) {
-                expressie.setError("Beide operanden van +/− moeten hetzelfde, niet-boolean type hebben (CH02).");
+                expressie.setError("Beide operanden van + en− moeten hetzelfde, niet boolean type hebben (CH02).");
                 return ExpressionType.UNDEFINED;
             }
-            // Resultaattype is het (gelijke) operanden-type
-            return linkerType;
+            return linkerType; // types zijn gelijk, dus dit is het resultaat
         }
 
-        // Vermenigvuldiging (van CH02, CH03)
+        // Vermenigvuldigen:
+        // * Geen kleuren (CH03)
+        // * Minstens eenn operand scalar, geen booleans (CH02)
         if (expressie instanceof MultiplyOperation) {
             Operation bewerking = (Operation) expressie;
             ExpressionType linkerType = typeOf(bewerking.lhs);
             ExpressionType rechterType = typeOf(bewerking.rhs);
 
-            // CH03: geen kleuren in rekenoperaties
             if (linkerType == ExpressionType.COLOR || rechterType == ExpressionType.COLOR) {
                 expressie.setError("Kleurwaarden mogen niet gebruikt worden in * (komt van CH03).");
                 return ExpressionType.UNDEFINED;
             }
 
-            // CH02: minstens eenn operand moet SCALAR zijn. geen BOOL
             boolean bevatBoolean = (linkerType == ExpressionType.BOOL || rechterType == ExpressionType.BOOL);
-            boolean heeftMinstensEenScalar = (linkerType == ExpressionType.SCALAR || rechterType == ExpressionType.SCALAR);
+            boolean heeftMinstensEenScalar =
+                    (linkerType == ExpressionType.SCALAR || rechterType == ExpressionType.SCALAR);
+
             if (bevatBoolean || !heeftMinstensEenScalar) {
-                expressie.setError("Bij vermenigvuldigen moet minstens één operand SCALAR zijn en geen van beide BOOL/KLEUR (CH02).");
+                expressie.setError("Bij vermenigvuldigen moet minstens een operand SCALAR zijn en geen van beide BOOL/KLEUR (CH02).");
                 return ExpressionType.UNDEFINED;
             }
 
-            // Resultaat: het niet-SCALAR type
+            // Resultaat is het niet-scalar type (of scalar als beide scalar zijn).
             if (linkerType == ExpressionType.SCALAR && rechterType == ExpressionType.SCALAR) {
                 return ExpressionType.SCALAR;
             }
             return (linkerType == ExpressionType.SCALAR) ? rechterType : linkerType;
         }
 
-        // Onbekend/complex = geen type
+        // Geen idee? Dan ga ik uit van undefined (checker houdt je hier wel tegen).
         return ExpressionType.UNDEFINED;
     }
 }
 
-//VOORBEELDEN WAAR IK MEE GETEST HEB WAAR DE PARSE GEHAALD WORDT MAAR NIET DE CHECKER:
-//UseLinkColor := 3px;
-//
-//a {
-//  color: 12px;
-//  if [UseLinkColor] {
-//    width: 10px;
-//  }
-//}
+/*
+Voorbeelden die ik gebruikte om te testen (moet parse slagen, maar check juist rode errors geven):
 
-//UseLinkColor := 3px;
-//
-//a {
-//  color: 12px;
-//  if [UseLinkColor] {
-//    width: 10px;
-//  }
-//}
+UseLinkColor := 3px;
+
+a {
+  color: 12px;        // fout: color verwacht een kleur (#rrggbb)
+  if [UseLinkColor] { // fout: if-voorwaarde moet boolean zijn
+    width: 10px;
+  }
+}
+
+UseLinkColor := 3px;
+
+a {
+  color: 12px;
+  if [UseLinkColor] {
+    width: 10px;
+  }
+}
+*/
