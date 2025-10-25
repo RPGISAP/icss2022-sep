@@ -17,17 +17,21 @@ public class Stylesheet extends ASTNode {
 	public Stylesheet() {
 		this.body = new ArrayList<>();
 	}
+
 	public Stylesheet(ArrayList<ASTNode> body) {
 		this.body = body;
 	}
+
 	@Override
 	public String getNodeLabel() {
 		return "Stylesheet";
 	}
+
 	@Override
 	public ArrayList<ASTNode> getChildren() {
 		return this.body;
 	}
+
 	@Override
 	public ASTNode addChild(ASTNode child) {
 	    	body.add(child);

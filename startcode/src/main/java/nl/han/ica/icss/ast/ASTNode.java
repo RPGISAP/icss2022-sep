@@ -50,6 +50,8 @@ public class ASTNode {
         return error != null;
     }
 
+
+
 	@Override
 	public String toString() {
 		StringBuilder result = new StringBuilder();
