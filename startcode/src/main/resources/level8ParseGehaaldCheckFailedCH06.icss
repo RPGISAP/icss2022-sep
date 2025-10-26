@@ -1,0 +1,2 @@
+p { if[TRUE]{ W := 10px; } width: W; }
+p { width: X; X := 10px; }
