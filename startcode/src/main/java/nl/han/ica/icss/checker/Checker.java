@@ -117,36 +117,28 @@ public class Checker {
             defineVar(variabeleToekenning.name.name, typeVanRechterZijde);
 
         } else if (huidigKnooppunt instanceof Declaration) {
-            // Declaraties (property: value): check of de value past bij de property
             Declaration declaratie = (Declaration) huidigKnooppunt;
-
-            // Alleen checken als er ook echt een waarde (expression) staat
-            if (!declaratie.getChildren().isEmpty()
-                    && declaratie.getChildren().get(0) instanceof Expression) {
-
-                Expression waarde = (Expression) declaratie.getChildren().get(0);
+            Expression waarde = declaratie.expression;
+            if (waarde == null) {
+                // Niets te checken
+            } else {
+                // Dit triggert ook CH02/CH03/CH06 via typeOf()
                 ExpressionType typeVanWaarde = typeOf(waarde);
-
-                // Property naam pak ik als string (PropertyName is hier geen enum).
                 String eigenschapTekst = (declaratie.property == null)
                         ? ""
-                        : declaratie.property.toString().toLowerCase(java.util.Locale.ROOT);
+                        : declaratie.property.name.toLowerCase(java.util.Locale.ROOT);
 
-                // Alleen deze properties zijn toegestaan. Type moet kloppen
+                // dit is voor CH04 type moet passen bij property
                 if ("color".equals(eigenschapTekst) || "background-color".equals(eigenschapTekst)) {
                     if (typeVanWaarde != ExpressionType.COLOR) {
                         declaratie.setError("Eigenschap '" + eigenschapTekst + "' verwacht een kleurwaarde (CH04).");
                     }
                 } else if ("width".equals(eigenschapTekst) || "height".equals(eigenschapTekst)) {
-                    boolean isToegestaneLengte =
-                            (typeVanWaarde == ExpressionType.PIXEL || typeVanWaarde == ExpressionType.PERCENTAGE);
-                    if (!isToegestaneLengte) {
-                        declaratie.setError(
-                                "Eigenschap '" + eigenschapTekst + "' verwacht een pixel- of percentagewaarde (CH04)."
-                        );
+                    if (!(typeVanWaarde == ExpressionType.PIXEL || typeVanWaarde == ExpressionType.PERCENTAGE)) {
+                        declaratie.setError("Eigenschap '" + eigenschapTekst + "' verwacht een pixel- of percentagewaarde (CH04).");
                     }
                 } else {
-                    // Alles buiten de whitelist is in ICSS niet toegestaan
+                    // Niet-toegestane property volgens opdracht
                     declaratie.setError("Eigenschap '" + eigenschapTekst + "' is niet toegestaan in ICSS.");
                 }
             }
@@ -163,7 +155,7 @@ public class Checker {
         }
     }
 
-    // Typebepaling voor expressies + regels CH02/CH03
+    // Typebepaling voor expressies en regels voor CH02/CH03
     private ExpressionType typeOf(Expression expressie) {
         if (expressie == null) return ExpressionType.UNDEFINED;
 
@@ -239,25 +231,3 @@ public class Checker {
         return ExpressionType.UNDEFINED;
     }
 }
-
-/*
-Voorbeelden die ik gebruikte om te testen (moet parse slagen, maar check juist rode errors geven):
-
-UseLinkColor := 3px;
-
-a {
-  color: 12px;        // fout: color verwacht een kleur (#rrggbb)
-  if [UseLinkColor] { // fout: if-voorwaarde moet boolean zijn
-    width: 10px;
-  }
-}
-
-UseLinkColor := 3px;
-
-a {
-  color: 12px;
-  if [UseLinkColor] {
-    width: 10px;
-  }
-}
-*/

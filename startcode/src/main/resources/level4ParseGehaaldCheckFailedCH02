@@ -1,0 +1,2 @@
+p { width: 2px * 3px; };
+p { width: 10px + 5%; };
