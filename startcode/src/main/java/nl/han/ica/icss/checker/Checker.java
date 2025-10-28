@@ -231,3 +231,6 @@ public class Checker {
         return ExpressionType.UNDEFINED;
     }
 }
+
+//Iedere variabele mag alleen een vast type hebben. Dan mag Var := 10px; en daarna Var := 5%; niet voorkomen.
+//Deze ga ik doen, aangezien deze een kleinere opdracht is dan de andere hebben we hier 5 punten voor afgesrpoken.

@@ -6,6 +6,10 @@ import nl.han.ica.icss.ast.AST;
 import nl.han.ica.icss.ast.ASTNode;
 import nl.han.ica.icss.ast.Expression;
 import nl.han.ica.icss.ast.VariableReference;
+import nl.han.ica.icss.ast.*;
+import nl.han.ica.icss.ast.selectors.*;
+import nl.han.ica.icss.ast.literals.*;
+import nl.han.ica.icss.ast.operations.*;
 
 public class ASTListener extends ICSSBaseListener {
 
@@ -43,7 +47,7 @@ public class ASTListener extends ICSSBaseListener {
 	}
 
 	private void hangAanOuder(ASTNode kind) {
-		if (kind == null) return;   // << voorkom null-kind in AST
+		if (kind == null) return;   // voorkom null-kind in AST
 		top().addChild(kind);
 	}
 
@@ -70,7 +74,7 @@ public class ASTListener extends ICSSBaseListener {
 		int aantal = expressieStackGrootte - indexVoor;
 		java.util.List<Expression> exprs = new java.util.ArrayList<>(aantal);
 		for (int i = 0; i < aantal; i++) {
-			// pop in LIFO; vooraan toevoegen om volgorde links->rechts te behouden
+			// pop in LIFO, vooraan toevoegen om volgorde links naar rechts te behouden
 			exprs.add(0, exprPop());
 		}
 		return exprs;
@@ -79,19 +83,19 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void enterStylesheet(ICSSParser.StylesheetContext ctx) {
-		nl.han.ica.icss.ast.Stylesheet sheet = new nl.han.ica.icss.ast.Stylesheet();
+		Stylesheet sheet = new Stylesheet();
 		ast.setRoot(sheet);
 		push(sheet);
 	}
 
 	@Override
 	public void exitStylesheet(ICSSParser.StylesheetContext ctx) {
-		pop(); // done
+		pop();
 	}
 
 	@Override
 	public void enterRuleset(ICSSParser.RulesetContext ctx) {
-		nl.han.ica.icss.ast.Stylerule regel = new nl.han.ica.icss.ast.Stylerule();
+		Stylerule regel = new Stylerule();
 		push(regel);
 	}
 
@@ -104,24 +108,24 @@ public class ASTListener extends ICSSBaseListener {
 	@Override
 	public void enterIdSelector(ICSSParser.IdSelectorContext ctx) {
 		String tekst = ctx.ID_IDENT().getText().substring(1); // strip '#'
-		hangAanOuder(new nl.han.ica.icss.ast.selectors.IdSelector(tekst));
+		hangAanOuder(new IdSelector(tekst));
 	}
 
 	@Override
 	public void enterClassSelector(ICSSParser.ClassSelectorContext ctx) {
 		String tekst = ctx.CLASS_IDENT().getText().substring(1); // strip '.'
-		hangAanOuder(new nl.han.ica.icss.ast.selectors.ClassSelector(tekst));
+		hangAanOuder(new ClassSelector(tekst));
 	}
 
 	@Override
 	public void enterTagSelector(ICSSParser.TagSelectorContext ctx) {
 		String tekst = ctx.LOWER_IDENT().getText();
-		hangAanOuder(new nl.han.ica.icss.ast.selectors.TagSelector(tekst));
+		hangAanOuder(new TagSelector(tekst));
 	}
 
 	@Override
 	public void enterDeclaration(ICSSParser.DeclarationContext ctx) {
-		nl.han.ica.icss.ast.Declaration declaratie = new nl.han.ica.icss.ast.Declaration(ctx.LOWER_IDENT().getText());
+		Declaration declaratie = new Declaration(ctx.LOWER_IDENT().getText());
 		push(declaratie);
 		startFrame();
 
@@ -132,11 +136,11 @@ public class ASTListener extends ICSSBaseListener {
 		int indexVoor = eindFrameIndex();
 		java.util.List<Expression> waarden = pakOperandenSindsFrame(indexVoor);
 
-		nl.han.ica.icss.ast.Declaration decl = (nl.han.ica.icss.ast.Declaration) top();
+		Declaration decl = (Declaration) top();
 		if (!waarden.isEmpty()) {
 			decl.addChild(waarden.get(0));
 		} else {
-			decl.addChild(new nl.han.ica.icss.ast.literals.ScalarLiteral(0));
+			decl.addChild(new ScalarLiteral(0));
 		}
 		ASTNode declaratie = pop();
 		hangAanOuder(declaratie);
@@ -146,20 +150,20 @@ public class ASTListener extends ICSSBaseListener {
 	public void enterPrimaryExpr(ICSSParser.PrimaryExprContext ctx) {
 		if (ctx.PIXELSIZE() != null) {
 			int v = Integer.parseInt(ctx.PIXELSIZE().getText().replace("px", ""));
-			exprPush(new nl.han.ica.icss.ast.literals.PixelLiteral(v));
+			exprPush(new PixelLiteral(v));
 		} else if (ctx.PERCENTAGE() != null) {
 			int v = Integer.parseInt(ctx.PERCENTAGE().getText().replace("%", ""));
-			exprPush(new nl.han.ica.icss.ast.literals.PercentageLiteral(v));
+			exprPush(new PercentageLiteral(v));
 		} else if (ctx.SCALAR() != null) {
-			exprPush(new nl.han.ica.icss.ast.literals.ScalarLiteral(Integer.parseInt(ctx.SCALAR().getText())));
+			exprPush(new ScalarLiteral(Integer.parseInt(ctx.SCALAR().getText())));
 		} else if (ctx.COLOR() != null) {
-			exprPush(new nl.han.ica.icss.ast.literals.ColorLiteral(ctx.COLOR().getText()));
+			exprPush(new ColorLiteral(ctx.COLOR().getText()));
 		} else if (ctx.TRUE() != null) {
-			exprPush(new nl.han.ica.icss.ast.literals.BoolLiteral(true));
+			exprPush(new BoolLiteral(true));
 		} else if (ctx.FALSE() != null) {
-			exprPush(new nl.han.ica.icss.ast.literals.BoolLiteral(false));
+			exprPush(new BoolLiteral(false));
 		} else if (ctx.CAPITAL_IDENT() != null) {
-			exprPush(new nl.han.ica.icss.ast.VariableReference(ctx.CAPITAL_IDENT().getText()));
+			exprPush(new VariableReference(ctx.CAPITAL_IDENT().getText()));
 		}
 	}
 
@@ -175,7 +179,7 @@ public class ASTListener extends ICSSBaseListener {
 		if (factoren.isEmpty()) return;
 		Expression acc = factoren.get(0);
 		for (int i = 1; i < factoren.size(); i++) {
-			nl.han.ica.icss.ast.operations.MultiplyOperation op = new nl.han.ica.icss.ast.operations.MultiplyOperation();
+			MultiplyOperation op = new MultiplyOperation();
 			op.lhs = acc;
 			op.rhs = factoren.get(i);
 			acc = op;
@@ -205,12 +209,12 @@ public class ASTListener extends ICSSBaseListener {
 		for (int i = 0; i < operators.size(); i++) {
 			Expression rhs = termen.get(i + 1);
 			if ("+".equals(operators.get(i))) {
-				nl.han.ica.icss.ast.operations.AddOperation add = new nl.han.ica.icss.ast.operations.AddOperation();
+				AddOperation add = new AddOperation();
 				add.lhs = acc;
 				add.rhs = rhs;
 				acc = add;
 			} else {
-				nl.han.ica.icss.ast.operations.SubtractOperation sub = new nl.han.ica.icss.ast.operations.SubtractOperation();
+				SubtractOperation sub = new SubtractOperation();
 				sub.lhs = acc;
 				sub.rhs = rhs;
 				acc = sub;
@@ -223,25 +227,25 @@ public class ASTListener extends ICSSBaseListener {
 	public void enterBoolExpression(ICSSParser.BoolExpressionContext ctx) {
 		// Maak de conditie-expressie uit de tekst
 		String txt = ctx.getText();
-		nl.han.ica.icss.ast.Expression cond;
+		Expression cond;
 		if ("TRUE".equals(txt)) {
-			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(true);
+			cond = new BoolLiteral(true);
 		} else if ("FALSE".equals(txt)) {
-			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(false);
+			cond = new BoolLiteral(false);
 		} else {
-			cond = new nl.han.ica.icss.ast.VariableReference(txt);
+			cond = new VariableReference(txt);
 		}
 		exprPush(cond);
 		ASTNode boven = top();
-		if (boven instanceof nl.han.ica.icss.ast.IfClause) {
-			((nl.han.ica.icss.ast.IfClause) boven).conditionalExpression = cond;
+		if (boven instanceof IfClause) {
+			((IfClause) boven).conditionalExpression = cond;
 		}
 	}
 
 	@Override
 	public void enterVariableAssignment(ICSSParser.VariableAssignmentContext ctx) {
-		nl.han.ica.icss.ast.VariableAssignment toekenning = new nl.han.ica.icss.ast.VariableAssignment();
-		toekenning.name = new nl.han.ica.icss.ast.VariableReference(ctx.CAPITAL_IDENT().getText());
+		VariableAssignment toekenning = new VariableAssignment();
+		toekenning.name = new VariableReference(ctx.CAPITAL_IDENT().getText());
 		push(toekenning);
 		startFrame(); // waarde van de variabele
 	}
@@ -251,7 +255,7 @@ public class ASTListener extends ICSSBaseListener {
 		int indexVoor = eindFrameIndex();
 		java.util.List<Expression> waarden = pakOperandenSindsFrame(indexVoor);
 		if (!waarden.isEmpty()) {
-			((nl.han.ica.icss.ast.VariableAssignment) top()).addChild(waarden.get(0));
+			((VariableAssignment) top()).addChild(waarden.get(0));
 		}
 		ASTNode klaar = pop();       // heel belangrijk: haal de assignment van de stack
 		hangAanOuder(klaar);         // en hang ‘m aan de huidige ouder (Stylesheet)
@@ -259,18 +263,18 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void enterIfClause(ICSSParser.IfClauseContext ctx) {
-		nl.han.ica.icss.ast.IfClause ifNode = new nl.han.ica.icss.ast.IfClause();
+		IfClause ifNode = new IfClause();
 
-		nl.han.ica.icss.ast.Expression cond;
+		Expression cond;
 		String txt = (ctx.boolExpression() != null) ? ctx.boolExpression().getText() : null;
 		if ("TRUE".equals(txt)) {
-			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(true);
+			cond = new BoolLiteral(true);
 		} else if ("FALSE".equals(txt)) {
-			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(false);
+			cond = new BoolLiteral(false);
 		} else if (txt != null && !txt.isEmpty()) {
-			cond = new nl.han.ica.icss.ast.VariableReference(txt);
+			cond = new VariableReference(txt);
 		} else {
-			cond = new nl.han.ica.icss.ast.literals.BoolLiteral(true);
+			cond = new BoolLiteral(true);
 		}
 		ifNode.conditionalExpression = cond;
 		startFrame();
@@ -294,19 +298,19 @@ public class ASTListener extends ICSSBaseListener {
 			String raw = ifCondBuffer.toString().trim();
 			if (!raw.isEmpty()) {
 				if ("TRUE".equals(raw)) {
-					conds.add(new nl.han.ica.icss.ast.literals.BoolLiteral(true));
+					conds.add(new BoolLiteral(true));
 				} else if ("FALSE".equals(raw)) {
-					conds.add(new nl.han.ica.icss.ast.literals.BoolLiteral(false));
+					conds.add(new BoolLiteral(false));
 				} else {
-					conds.add(new nl.han.ica.icss.ast.VariableReference(raw));
+					conds.add(new VariableReference(raw));
 				}
 			}
 		}
 		if (conds.isEmpty()) {
-			conds.add(new nl.han.ica.icss.ast.literals.BoolLiteral(true));
+			conds.add(new BoolLiteral(true));
 		}
 
-		nl.han.ica.icss.ast.IfClause ifNodeObj = (nl.han.ica.icss.ast.IfClause) top();
+		IfClause ifNodeObj = (IfClause) top();
 		ifNodeObj.conditionalExpression = conds.get(0);
 
 		ASTNode ifNode = pop();
@@ -314,19 +318,20 @@ public class ASTListener extends ICSSBaseListener {
 	}
 
 
+
 	@Override
 	public void visitTerminal(org.antlr.v4.runtime.tree.TerminalNode node) {
 		int t = node.getSymbol().getType();
-		if (t == ICSSParser.ELSE && top() instanceof nl.han.ica.icss.ast.IfClause) {
-			nl.han.ica.icss.ast.IfClause ifNode = (nl.han.ica.icss.ast.IfClause) top();
+		if (t == ICSSParser.ELSE && top() instanceof IfClause) {
+			IfClause ifNode = (IfClause) top();
 			if (ifNode.elseClause == null) {
-				ifNode.elseClause = new nl.han.ica.icss.ast.ElseClause();
+				ifNode.elseClause = new ElseClause();
 			}
 			push(ifNode.elseClause);
 			elseActief = true;
 			return;
 		}
-		if (top() instanceof nl.han.ica.icss.ast.IfClause) {
+		if (top() instanceof IfClause) {
 			if (t == ICSSParser.BOX_BRACKET_OPEN) { inIfVoorwaarde = true; ifCondBuffer.setLength(0); return; }
 			if (t == ICSSParser.BOX_BRACKET_CLOSE) { inIfVoorwaarde = false; return; }
 			if (inIfVoorwaarde) {
