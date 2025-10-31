@@ -88,7 +88,6 @@ public class Checker {
         }
 
         // Node-specifieke checks
-
         if (huidigKnooppunt instanceof VariableAssignment) {
             // eerst type bepalen van de rechterkant
             VariableAssignment variabeleToekenning = (VariableAssignment) huidigKnooppunt;
@@ -113,8 +112,20 @@ public class Checker {
                 );
             }
 
-            // Variabele direct vastleggen in de huidige scope
-            defineVar(variabeleToekenning.name.name, typeVanRechterZijde);
+// Extra Opdracht: Iedere variabele mag alleen een vast type hebben. Dan mag Var := 10px; en daarna Var := 5%; niet voorkomen.
+            String varNaam = variabeleToekenning.name.name;
+            ExpressionType bestaandType = lookupVarType(varNaam);
+            if (bestaandType != ExpressionType.UNDEFINED && bestaandType != typeVanRechterZijde) {
+                // Type wisselen is niet toegestaan
+                variabeleToekenning.setError(
+                        "Variabele '" + varNaam + "' heeft al type " + bestaandType +
+                                " en kan niet opnieuw worden toegewezen aan type " + typeVanRechterZijde + " (Extra Opdracht)."
+                );
+                // Houd bestaand type aan om verdere checks consistent te houden
+                defineVar(varNaam, bestaandType);
+            } else {
+                defineVar(varNaam, typeVanRechterZijde);
+            }
 
         } else if (huidigKnooppunt instanceof Declaration) {
             Declaration declaratie = (Declaration) huidigKnooppunt;
@@ -234,3 +245,4 @@ public class Checker {
 
 //Iedere variabele mag alleen een vast type hebben. Dan mag Var := 10px; en daarna Var := 5%; niet voorkomen.
 //Deze ga ik doen, aangezien deze een kleinere opdracht is dan de andere hebben we hier 5 punten voor afgesrpoken.
+//De opdracht is genotteerd op regel 116 van Checker.java

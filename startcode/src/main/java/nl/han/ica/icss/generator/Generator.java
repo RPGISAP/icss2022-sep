@@ -19,10 +19,10 @@ import nl.han.ica.icss.ast.literals.ScalarLiteral;
 public class Generator {
 
 	public String generate(AST ast) {
-// Geen AST? Geen output.
+		// Geen AST? Geen output.
 		if (ast == null || ast.root == null) return "";
 
-		// We bouwen hier de uiteindelijke CSS-string in op.
+		// Bouw hier de uiteindelijke CSS string in op.
 		StringBuilder css = new StringBuilder();
 
 		// Start bij het stylesheet en loop alles netjes af.
@@ -30,7 +30,7 @@ public class Generator {
 		return css.toString();
 	}
 
-	// Loopt over de bovenste laag (stylesheet) en pakt alleen stylerules mee.
+	// Loopt over de bovenste laag (stylesheet) en pakt alleen die stylerules mee.
 	private void genereerStylesheet(Stylesheet stijlblad, StringBuilder css, int inspringNiveau) {
 		for (ASTNode knoop : stijlblad.body) {
 			if (knoop instanceof Stylerule) {
@@ -39,7 +39,7 @@ public class Generator {
 		}
 	}
 
-	// Schrijft één hele CSS-regel (selectors + blok met declaraties).
+	// Schrijft een hele CSS-regel (selectors + blok met declaraties).
 	private void genereerRegel(Stylerule stijlregel, StringBuilder css, int inspringNiveau) {
 		// Selectors aan elkaar plakken (met comma’s ertussen).
 		StringBuilder selectorTekst = new StringBuilder();
@@ -62,7 +62,7 @@ public class Generator {
 		inspring(css, inspringNiveau).append("}\n");
 	}
 
-	// Schrijft één "property: value;" regel.
+	// Schrijft een "property: value." regel.
 	private void genereerDeclaratie(Declaration declaratie, StringBuilder css, int inspringNiveau) {
 		// Pak de echte property-naam (zit in 'name', niet via toString()).
 		String propertyNaam = (declaratie.property != null) ? declaratie.property.name : "";
@@ -75,7 +75,7 @@ public class Generator {
 				.append(";\n");
 	}
 
-	// Zet een Selector om naar de juiste CSS-tekst (#id, .class, of tag).
+	// Dit zet een Selector om naar de juiste CSS-tekst (#id, .class, of tag).
 	private String selectorNaarTekst(Selector selector) {
 		if (selector instanceof IdSelector) {
 			return "#" + ((IdSelector) selector).id;
@@ -99,7 +99,7 @@ public class Generator {
 			return ((PercentageLiteral) expressie).value + "%";
 		}
 		if (expressie instanceof ColorLiteral) {
-			return ((ColorLiteral) expressie).value; // bijv. "#ff0000"
+			return ((ColorLiteral) expressie).value;
 		}
 		if (expressie instanceof BoolLiteral) {
 			return ((BoolLiteral) expressie).value ? "TRUE" : "FALSE";

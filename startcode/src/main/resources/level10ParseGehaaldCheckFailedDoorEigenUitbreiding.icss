@@ -1,0 +1,4 @@
+Var := 10px;
+Var := 5%;
+
+div { width: Var; }

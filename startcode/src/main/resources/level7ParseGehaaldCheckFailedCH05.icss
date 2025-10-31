@@ -1,12 +1,7 @@
-LinkColor := #ff0000;
-ParWidth := 500px;
-AdjustColor := TRUE;
-UseLinkColor := FALSE;
+UseLinkColor := #ff0000;
 
-UseLinkColor := 3px;
-a {
-color: 12px;
-if [UseLinkColor] {
-width: 10px;
-}
+p {
+  if [UseLinkColor] {
+    color: #000000;
+  }
 }

@@ -13,7 +13,7 @@ import java.util.List;
 public class Evaluator implements Transform {
 
     // Ik hou een stack van scopes bij. Bovenaan ligt altijd de huidige scope.
-    // In de scope map ik variabele-namen naar Literalwaardes.
+    // In de scope map ik variabele namen naar Literalwaardes.
     private IHANLinkedList<HashMap<String, Literal>> stackScopes = new HANLinkedList<>();
 
     @Override
@@ -80,7 +80,7 @@ public class Evaluator implements Transform {
         List<ASTNode> bewerkbareLijst = modificeerbareBodyVan(ouderKnoop);
 
         if (bewerkbareLijst != null) {
-            // Index-gestuurde for-loop zodat ik tijdens het lopen veilig kan splicen.
+            // Index gestuurde forloop zodat ik tijdens het lopen veilig kan splicen.
             for (int index = 0; index < bewerkbareLijst.size(); index++) {
                 ASTNode huidigeKnoop = bewerkbareLijst.get(index);
 
